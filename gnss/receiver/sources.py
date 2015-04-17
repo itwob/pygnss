@@ -49,7 +49,7 @@ class Source:
             n = 0
         if len(self.buffer) <= n + block_size:
             raise Exception('requested sample range extends beyond buffer sample range')
-        time = n / self.f_samp
+        time = self.buffer_start_time + n / self.f_samp
         return self.buffer[n:n + block_size], time
     
     @property
@@ -127,9 +127,14 @@ class FileSource(Source):
         previous buffer by `overlap` samples.
         '''
         # TODO handle overlap and buffer size incompatibilities?
-        self.file_loc += self.buffer_size - overlap  #TODO THIS IS WRONG
+        self.file_loc = int(self.file_loc + (self.buffer_size - overlap) * self.bytes_per_sample)
         self.buffer_start_time += (self.buffer_size - overlap) / self.f_samp
         self.load(overlap)
+
+    def reset(self):
+        self.file_loc = 0
+        self.buffer_start_time = 0
+        self.load()
 
         
 class FileSource4BitComplexWithMetaData(FileSource):

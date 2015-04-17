@@ -30,6 +30,7 @@ class CoarseAcquirer:
         return self.snr + 10 * log(1 / self.block_length)
         
     def acquire(self, signal, time=None):
+        '''If `time` is `None` (default), performs acquisition at source buffer start (see `sources`)'''
         # correlate
         samples, self.time = self.source.get(self.num_samples, time)
         fft_blocks = fft(samples[:self.num_samples].reshape((self.num_blocks, self.num_block_samples)), axis=1)
