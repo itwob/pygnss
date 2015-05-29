@@ -5,15 +5,14 @@ coordinate_utils.py
 @email brianbreitsch@gmail.com
 """
 
-
-import numpy as np
-
+from numpy import sin, cos, tan, array, zeros, sqrt, arctan2, rad2deg, deg2rad, column_stack, absolute, arcsin
+import numpy
 
 def make_3_tuple_array(arr):
     """Reshapes ndarray so that it has dimensions (N,3)
     """
     if type(arr) == list:
-        arr = np.array(arr)
+        arr = array(arr)
     assert(arr.ndim <= 2 and arr.size >= 3)
     if arr.shape[0] == 3:
         arr = arr.reshape((1,3)) if arr.ndim == 1 else arr.T
@@ -21,7 +20,7 @@ def make_3_tuple_array(arr):
     return arr
 
 
-def ecef2geo(x_ref):
+def ecef2geo(x_ref, N=None):
     """Converts ECEF coordinates to geodetic coordinates, 
 
     Parameters
@@ -32,19 +31,19 @@ def ecef2geo(x_ref):
     -------
     output : (N,3) ndarray
         geodetic coordinates
+    `N` : (optional) the radius of curvature, passed in as output parameter
 
     Notes
     -----
-   
-    >>> import numpy as np
-    >>> geo = np.array([27.174167, 78.042222, 0])
-    >>> ecef = geo2ecef(np.deg2rad(geo))
+    >>> from numpy import array, deg2rad
+    >>> geo = array([27.174167, 78.042222, 0])
+    >>> ecef = geo2ecef(deg2rad(geo))
     >>> new_geo = ecef2geo(ecef)
     array([[             nan],
     	   [  7.08019709e+01],
            [ -6.37805436e+06]])
     >>> # [1176.45, 5554.887, 2895.397] << should be this 
-    >>> ecef2geo(np.array([
+    >>> ecef2geo(array([
     	[27.174167, 78.042222, 0],
     	[39.5075, -84.746667, 0]])).reshaps((3,2))
     array([[             nan,              nan],
@@ -64,29 +63,32 @@ def ecef2geo(x_ref):
     x = x_ref[:,0]; y = x_ref[:,1]; z = x_ref[:,2];
 
     # We must iteratively derive N
-    lat = np.arctan2(z, np.sqrt(x**2 + y**2))
-    h = z / np.sin(lat)
+    lat = arctan2(z, sqrt(x**2 + y**2))
+    h = z / sin(lat)
     d_h = 1.; d_lat = 1.
+
+    if not N:
+        N = zeros(x_ref.shape[0])
 
     while (d_h > 1e-10) and (d_lat > 1e-10):
     
-        N = a**2 / (np.sqrt(a**2 * np.cos(lat)**2 + b**2 * np.sin(lat)**2))
+        N[:] = a**2 / (sqrt(a**2 * cos(lat)**2 + b**2 * sin(lat)**2))
         N1 = N * (b / a)**2
     
-        temp_h = np.sqrt(x**2 + y**2) / np.cos(lat) - N
-        temp_lat = np.arctan2(z / (N1 + h), np.sqrt(x**2 + y**2) / (N + h))
-        d_h = np.max(np.abs(h - temp_h))
-        d_lat = np.max(np.abs(lat - temp_lat))
+        temp_h = sqrt(x**2 + y**2) / cos(lat) - N
+        temp_lat = arctan2(z / (N1 + h), sqrt(x**2 + y**2) / (N + h))
+        d_h = numpy.max(absolute(h - temp_h))
+        d_lat = numpy.max(absolute(lat - temp_lat))
 
         h = temp_h
         lat = temp_lat
 
-    lon = np.arctan2(y,x)
+    lon = arctan2(y,x)
 
-    lat = np.rad2deg(lat)
-    lon = np.rad2deg(lon)
+    lat = rad2deg(lat)
+    lon = rad2deg(lon)
 
-    geo = np.column_stack((lat, lon, h))
+    geo = column_stack((lat, lon, h))
     return geo.squeeze()
 
 
@@ -114,12 +116,12 @@ def ecef2enu(x_ref, x_obj):
     geo = ecef2geo(x_ref)
     if geo.shape != (3,):
         raise Exception('ecef2enu can only handle one reference position')
-    lat = np.deg2rad(geo[0]); lon = np.deg2rad(geo[1])
+    lat = deg2rad(geo[0]); lon = deg2rad(geo[1])
 
     # create the rotation matrix
-    Rl = np.array([[-np.sin(lon),               np.cos(lon),              0],
-          [-np.sin(lat) * np.cos(lon), -np.sin(lat) * np.sin(lon), np.cos(lat)],
-          [np.cos(lat) * np.cos(lon),  np.cos(lat) * np.sin(lon), np.sin(lat)]])
+    Rl = array([[-sin(lon),               cos(lon),              0],
+          [-sin(lat) * cos(lon), -sin(lat) * sin(lon), cos(lat)],
+          [cos(lat) * cos(lon),  cos(lat) * sin(lon), sin(lat)]])
     # NOTE: This matrix is not fixed to do multiple user locations yet...
 
     dx = x_obj - x_ref
@@ -141,6 +143,7 @@ def ecef2sky(x_ref, x_obj):
     -------
     output : ndarray of shape(N,2)
         The objects' sky coordinatescoordinates
+        (azimuth, elevation in degrees)
 
     Notes
     -----
@@ -149,10 +152,10 @@ def ecef2sky(x_ref, x_obj):
     enu = ecef2enu(x_ref, x_obj)
     enu = make_3_tuple_array(enu)
     e = enu[:, 0]; n = enu[:, 1]; u = enu[:, 2]
-    az = np.arctan2(e, n)
-    el = np.arcsin(u / np.sqrt(e**2 + n**2 + u**2))
+    az = arctan2(e, n)
+    el = arcsin(u / sqrt(e**2 + n**2 + u**2))
 
-    return np.column_stack((np.rad2deg(az), np.rad2deg(el))).squeeze()
+    return column_stack((rad2deg(az), rad2deg(el))).squeeze()
 
 
 def geo2ecef(geo):
@@ -175,16 +178,16 @@ def geo2ecef(geo):
     a = 6378137. # Earth semi-major axis (m)
     rf = 298.257223563 # Reciprocal flattening (1/f)
     b = a * (rf - 1) / rf # Earth semi-minor axis derived from f = (a - b) / a
-    lat = np.deg2rad(geo[:, 0]); lon = np.deg2rad(geo[:, 1]); h = geo[:, 2]
+    lat = deg2rad(geo[:, 0]); lon = deg2rad(geo[:, 1]); h = geo[:, 2]
 
-    N = a**2 / np.sqrt(a**2 * np.cos(lat)**2 + b**2 * np.sin(lat)**2)
+    N = a**2 / sqrt(a**2 * cos(lat)**2 + b**2 * sin(lat)**2)
     N1 = N * (b / a)**2
 
-    x = (N + h) * np.cos(lat) * np.cos(lon)
-    y = (N + h) * np.cos(lat) * np.sin(lon)
-    z = (N1 + h) * np.sin(lat)
+    x = (N + h) * cos(lat) * cos(lon)
+    y = (N + h) * cos(lat) * sin(lon)
+    z = (N1 + h) * sin(lat)
 
-    x_ref = np.column_stack((x, y, z))
+    x_ref = column_stack((x, y, z))
     return x_ref.squeeze()
 
 
@@ -202,7 +205,7 @@ def geo2sky(geo_ref, geo_obj):
     Returns
     -------
     output : ndarray of shape(N,2)
-        sky coordinates (azimuth, elevation)
+        sky coordinates (azimuth, elevation in degrees)
 
     Notes
     -----

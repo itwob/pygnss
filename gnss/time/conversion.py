@@ -25,7 +25,7 @@ OffsetEpoch = namedtuple('OffsetEpoch', ['epoch', 'offset'])
 
 NTP_EPOCH = datetime(year=1900, month=1, day=1, hour=0, minute=0, second=0, tzinfo=UTC)
 GPS_EPOCH = datetime(year=1980, month=1, day=6, hour=0, minute=0, second=0, tzinfo=UTC)
-SECONDS_IN_WEEK = 60 * 60 * 24 * 7
+SECONDS_IN_WEEK = 3600 * 24 * 7
 LEAP_SECOND_EPOCHS = []
 
 def download_tai_leap_seconds(filepath):
@@ -149,3 +149,11 @@ def utctime(seconds, week_no=None):
     ## TODO this is a tricky function
     time = GPS_EPOCH + timedelta(seconds=total_seconds)
     return time + gpstime.gps_tai_offset - utc_tai_offset(time)
+
+
+def gpsseconds(week_no, tow, rollover=0):
+    '''Returns the GPS time in seconds since GPS epoch given
+    the week number and time of week in seconds. Also accepts
+    `rollover` argument (default 0).
+    '''
+    return (week_no + rollover * 1024) * SECONDS_IN_WEEK + tow

@@ -75,6 +75,7 @@ class CoarseAcquirerLowMem(CoarseAcquirer):
         self.num_samples = self.num_blocks * self.num_block_samples
         self.t = arange(self.num_block_samples) / source.f_samp
         self.time = None
+        self.corr_max = zeros((len(self.dopp_bins),))  # value
         
     def acquire(self, signal, time=None):
         # correlate
@@ -83,14 +84,13 @@ class CoarseAcquirerLowMem(CoarseAcquirer):
         indices = (floor(self.t * signal.code.rate) % len(signal.code.sequence)).astype(int)
         code_samples = 1. - 2. * signal.code.sequence[indices]
         f_inter = signal.f_carrier - self.source.f_center
-        corr_max = zeros((len(self.dopp_bins),))  # value
         n0 = zeros((len(self.dopp_bins),))  # n0
         corr_std = corr_var = 0.
         for i, f_dopp in enumerate(self.dopp_bins):
             reference = code_samples * exp(2j * pi * (f_inter + f_dopp) * self.t)
             conjugate_fft = conj(fft(reference))
             correlation = absolute(npsum(ifft(conjugate_fft * fft_blocks), axis=0)) / self.num_blocks
-            corr_max[i] = npmax(correlation)  # value
+            self.corr_max[i] = npmax(correlation)  # value
             n0[i] = argmax(correlation)  # n0
             corr_std += std(correlation)
             corr_var += var(correlation)
@@ -99,11 +99,8 @@ class CoarseAcquirerLowMem(CoarseAcquirer):
         corr_std /= len(self.dopp_bins)
         corr_var /= len(self.dopp_bins)
         # corr_std is noise floor, corr_var is noise power
-        dopp_bin = argmax(corr_max)
+        dopp_bin = argmax(self.corr_max)
         self.f_dopp = self.dopp_bins[dopp_bin]
         self.n0 = n0[dopp_bin] % nsc
         self.chip = (1. - self.n0 / nsc) * len(signal.code.sequence)
-        self.snr = 10 * log((corr_max[dopp_bin] - 1.) / corr_std)        
-        
-        # for plotting later
-        self.corr_max = corr_max
+        self.snr = 10 * log((self.corr_max[dopp_bin] - 1.) / corr_std)        

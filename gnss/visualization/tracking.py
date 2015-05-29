@@ -26,7 +26,35 @@ def plot_outputs(store, library='bokeh'):
     return None
 
 
+
 class TrackingPlot(object):
+    
+    def __init__(self, name, size=100):
+        self.name = name
+        self.size = size
+        
+        self.time = RingBuffer(size)
+        self.data = RingBuffer(size)
+       
+        plot = figure(title=self.name, plot_width=250, plot_height=250, tools="pan,wheel_zoom,box_zoom,reset,save")
+        plot.line(self.time.get(), self.data.get(), size=12, alpha=0.7, name=self.name)
+        self.plot = plot
+        
+        self.renderer = self.plot.select(dict(name=self.name))[0]
+    
+    def push_data(self, time, data):
+        self.time.extend(time)
+        self.data.extend(data)
+    
+    def update(self):
+        self.renderer.data_source.data['x'] = self.time.get()
+        self.renderer.data_source.data['y'] = self.data.get()
+        self.renderer.data_source._dirty = True
+        cursession().store_objects(self.renderer.data_source)
+
+
+class TrackingMultiPlot(object):
+    '''Does TrackingPlot for i corr, q corr, phase error, delay error simultaneously'''
     
     def __init__(self, size):
         self.size = size
@@ -56,18 +84,6 @@ class TrackingPlot(object):
         children = [self.i_corr_plot, self.q_corr_plot, self.phase_error_plot, self.delay_error_plot]
         self.plot = hplot(*children, name="tracking outputs")
         
-        self.i_corr_renderer = self.i_corr_plot.select(dict(name='i_corr'))[0]
-        self.q_corr_renderer = self.q_corr_plot.select(dict(name='q_corr'))[0]
-        self.phase_error_renderer = self.phase_error_plot.select(dict(name='phase_error'))[0]
-        self.delay_error_renderer = self.delay_error_plot.select(dict(name='delay_error'))[0]
-    
-    def show(self):
-        show(self.plot)
-        self.i_corr_renderer = self.i_corr_plot.select(dict(name='i_corr'))[0]
-        self.q_corr_renderer = self.q_corr_plot.select(dict(name='q_corr'))[0]
-        self.phase_error_renderer = self.phase_error_plot.select(dict(name='phase_error'))[0]
-        self.delay_error_renderer = self.delay_error_plot.select(dict(name='delay_error'))[0]
-    
     def push_data(self, time, i_corr, q_corr, phase_error, delay_error):
         self.time.extend(time)
         self.i_corr.extend(i_corr)
@@ -76,17 +92,22 @@ class TrackingPlot(object):
         self.delay_error.extend(delay_error)
     
     def update(self):
-        self.i_corr_renderer.data_source.data['x'] = self.time.get()
-        self.i_corr_renderer.data_source.data['y'] = self.i_corr.get()
-        self.q_corr_renderer.data_source.data['x'] = self.time.get()
-        self.q_corr_renderer.data_source.data['y'] = self.q_corr.get()
-        self.phase_error_renderer.data_source.data['x'] = self.time.get()
-        self.phase_error_renderer.data_source.data['y'] = self.phase_error.get()
-        self.delay_error_renderer.data_source.data['x'] = self.time.get()
-        self.delay_error_renderer.data_source.data['y'] = self.delay_error.get()
-        self.delay_error_renderer.data_source._dirty = True
-        cursession().store_objects(self.i_corr_renderer.data_source,
-                                   self.q_corr_renderer.data_source,
-                                   self.phase_error_renderer.data_source,
-                                   self.delay_error_renderer.data_source)
+        i_corr_renderer = self.i_corr_plot.select(dict(name='i_corr'))[0]
+        q_corr_renderer = self.q_corr_plot.select(dict(name='q_corr'))[0]
+        phase_error_renderer = self.phase_error_plot.select(dict(name='phase_error'))[0]
+        delay_error_renderer = self.delay_error_plot.select(dict(name='delay_error'))[0]
+    
+        i_corr_renderer.data_source.data['x'] = self.time.get()
+        i_corr_renderer.data_source.data['y'] = self.i_corr.get()
+        q_corr_renderer.data_source.data['x'] = self.time.get()
+        q_corr_renderer.data_source.data['y'] = self.q_corr.get()
+        phase_error_renderer.data_source.data['x'] = self.time.get()
+        phase_error_renderer.data_source.data['y'] = self.phase_error.get()
+        delay_error_renderer.data_source.data['x'] = self.time.get()
+        delay_error_renderer.data_source.data['y'] = self.delay_error.get()
+        q_corr_renderer.data_source._dirty = True
+        i_corr_renderer.data_source._dirty = True
+        phase_error_renderer.data_source._dirty = True
+        delay_error_renderer.data_source._dirty = True
+        cursession().store_objects(i_corr_renderer.data_source, q_corr_renderer.data_source, phase_error_renderer.data_source, delay_error_renderer.data_source)
 #         cursession().store_objects([i_corr_ds])

@@ -27,6 +27,7 @@ class Source:
         self.f_center = source_f_center
         self.bit_depth = bit_depth    # bits per sample component (8 bits total for real+imaginary)
         self.real = real
+        self.i_msb = True  # whether the complex component is in the most significant or least significant bits of a word or byte
         if buffer_size > Source.MAX_BUFFER_SIZE:
             raise Error('`buffer_size` exceeds `MAX_BUFFER_SIZE`')
         self.buffer_size = buffer_size
@@ -77,14 +78,17 @@ class Source:
         '''
         # typically real is upper nibble, complex is lower nibble, but TODO make this generic
         if self.bit_depth == 4:
-            real = (bitwise_and(byte_arr, 0x0f) << 4).astype(int8) >> 4
-            imag = bitwise_and(byte_arr, 0xf0).astype(int8) >> 4
+            lsb = (bitwise_and(byte_arr, 0x0f) << 4).astype(int8) >> 4
+            msb = bitwise_and(byte_arr, 0xf0).astype(int8) >> 4
         elif self.bit_depth == 8:
-            real = byte_arr[0::2]  # TODO this might not be working
-            imag = byte_arr[1::2]
+            msb = byte_arr[0::2]  # TODO this might not be working
+            lsb = byte_arr[1::2]
         else:
             raise Error('Bit depth not supported for complex samples')
-        return real + 1j * imag
+        if self.i_msb:
+            return lsb + 1j * msb
+        else:
+            return msb + 1j * lsb
 
 
 class FileSource(Source):
@@ -103,6 +107,7 @@ class FileSource(Source):
         if not buffer_size:
             buffer_size = self.file_size
         super(FileSource, self).__init__(file_f_samp, f_center, buffer_size, bit_depth, real, decimation)
+        self.file_duration = self.file_size / self.bytes_per_sample / self.source_f_samp
 
     def load(self, overlap=0):
         '''
@@ -120,6 +125,17 @@ class FileSource(Source):
             if self.decimation > 1:
                 temp = self.decimate(temp)
             self.buffer[overlap:] = temp
+
+    def seek(self, time):
+        '''Seek file offset to time in file.'''
+        min_time = 0.
+        max_time = self.file_size / (self.bytes_per_sample * self.source_f_samp)
+        #print(max_time)
+        if time < 0. or time >= max_time - self.buffer_size / self.f_samp:
+            # time out of bounds
+            raise Exception('time out of file range')
+        self.file_loc = int(time * self.source_f_samp * self.bytes_per_sample)
+        self.buffer_start_time = self.file_loc / self.bytes_per_sample / self.source_f_samp
             
     def advance(self, overlap=100000):
         '''
