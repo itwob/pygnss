@@ -5,7 +5,9 @@ coordinate_utils.py
 @email brianbreitsch@gmail.com
 """
 
-from numpy import sin, cos, tan, array, zeros, sqrt, arctan2, rad2deg, deg2rad, column_stack, absolute, arcsin
+from numpy import sin, cos, tan, array, zeros, sqrt, arctan2, rad2deg, deg2rad, column_stack, absolute, arcsin, pi, asarray
+from datetime import datetime, timedelta
+from pytz import UTC
 import numpy
 
 def make_3_tuple_array(arr):
@@ -67,7 +69,7 @@ def ecef2geo(x_ref, N=None):
     h = z / sin(lat)
     d_h = 1.; d_lat = 1.
 
-    if not N:
+    if numpy.any(N) is None:
         N = zeros(x_ref.shape[0])
 
     while (d_h > 1e-10) and (d_lat > 1e-10):
@@ -217,3 +219,64 @@ def geo2sky(geo_ref, geo_obj):
 
     sky = ecef2sky(x_ref, x_obj)
     return sky
+
+
+def eci2ecef(eci, time):
+    """Converts eci coordinates to ecef coordinates given
+    the time or times for said coordinates
+
+    Parameters
+    ----------
+    eci : ndarray of shape (N,3)
+    time : time array in GPS seconds of shape (N,)
+
+    Returns
+    -------
+    output : ndarray of shape (N,3)
+        ecef coordinates
+
+    Notes
+    Time of 2000 January 1, 12 UTC is (in GPS seconds) 630763213.0
+    -----
+    See: http://physics.stackexchange.com/questions/98466/radians-to-rotate-earth-to-match-eci-lat-lon-with-ecef-lat-lon
+
+    TODO: only accepts one time right now
+    """
+    #delta_days = (time - datetime64(datetime(2000, 1, 1, 12, tzinfo=UTC))) / timedelta64(1, 'D')
+    delta_days = (time - 630763213.0) / (3600 * 24)
+    gmst = 18.697374558 + 24.065709824419 * delta_days
+    theta = 2 * pi / 24 * gmst
+    rot = asarray([[ cos(gmst), sin(gmst), 0],
+                   [-sin(gmst), cos(gmst), 0],
+                   [ 0,         0,         1]])
+    return rot.dot(eci.T).T
+
+
+def ecef2eci(ecef, time):
+    """Converts ecef coordinates to eci coordinates given
+    the time or times for said coordinates
+
+    Parameters
+    ----------
+    ecef : ndarray of shape (N,3)
+    time : time array in GPS seconds of shape (N,)
+
+    Returns
+    -------
+    output : ndarray of shape (N,3)
+        eci coordinates
+
+    Notes
+    -----
+    See: http://physics.stackexchange.com/questions/98466/radians-to-rotate-earth-to-match-eci-lat-lon-with-ecef-lat-lon
+    Time of 2000 January 1, 12 UTC is (in GPS seconds) 630763213.0
+
+    TODO: only accepts one time right now
+    """
+    delta_days = (time - 630763213.0) / (3600 * 24)
+    gmst = 18.697374558 + 24.065709824419 * delta_days
+    theta = 2 * pi / 24 * gmst
+    rot = asarray([[cos(gmst), -sin(gmst), 0],
+                   [sin(gmst),  cos(gmst), 0],
+                   [ 0,         0,         1]])
+    return rot.dot(ecef.T).T
