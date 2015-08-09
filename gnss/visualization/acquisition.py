@@ -6,14 +6,14 @@ from bokeh.plotting import hplot, figure, show, cursession
 from gnss.acquisition import CoarseAcquirer, CoarseAcquirerLowMem, FineAcquirer
 
 def plot_coarse_acquisition_results(acq):
-    if type(acq) is CoarseAcquirerLowMem:
+    if isinstance(acq, CoarseAcquirerLowMem):
         dopp_min, dopp_max = acq.dopp_bins[0], acq.dopp_bins[-1]
         p = figure(title='correlation', x_range=[dopp_min, dopp_max], 
                 x_axis_label='doppler (Hz)', y_axis_label='correlation strength',
                 plot_width=500, plot_height=500)
         p.line(acq.dopp_bins, acq.corr_max)
         return p
-    elif type(acq) is CoarseAcquirer:
+    elif isinstance(acq, CoarseAcquirer):
         c1, c2 = acq.plot_code_window
         r, c = acq.plot_corr.shape
         img = ones((r, c), dtype=uint32)
@@ -29,7 +29,7 @@ def plot_coarse_acquisition_results(acq):
 
 
 def plot_fine_acquisition_results(acq):
-    if type(acq) is FineAcquirer:
+    if isinstance(acq, FineAcquirer):
         p = figure(title='fine phase', x_axis_label='time (s)', y_axis_label='phase (rad)', plot_width=500, plot_height=500)
         t = arange(len(acq.phases)) * acq.block_length
         p.line(t, unwrap(angle(acq.phases)))

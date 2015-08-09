@@ -12,14 +12,14 @@ class RingDoubleBuffer(object):
     def __getitem__(self, key):
         '''Adds `self.index` to the slice start and stop. Stop index should not
         go out of bounds of buffer. (Roll backs take place in `__setitem__`'''
-        if type(key) is int:
+        if isinstance(key, int):
             return self.buffer[key]
         key = slice(key.start if key.start else 0, key.stop if key.stop else self.size, key.step if key.step else None)
         return self.buffer[self.index + key.start: self.index + key.stop: key.step]
     
     def __setitem__(self, key, vals):
         '''Set items in buffer directly'''
-        if type(key) is int:
+        if isinstance(key, int):
             self.buffer[self.index] = vals
         else:
             self.buffer[self.index + key.start: self.index + key.stop: key.step] = val
