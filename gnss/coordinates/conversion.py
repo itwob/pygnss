@@ -11,8 +11,7 @@ import numpy
 def make_3_tuple_array(arr):
     """Reshapes ndarray so that it has dimensions (N,3)
     """
-    if type(arr) == list:
-        arr = array(arr)
+    arr = array(arr) if isinstance(arr, list) else arr
     assert(arr.ndim <= 2 and arr.size >= 3)
     if arr.shape[0] == 3:
         arr = arr.reshape((1,3)) if arr.ndim == 1 else arr.T

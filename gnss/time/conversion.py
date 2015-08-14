@@ -35,7 +35,7 @@ def download_tai_leap_seconds(filepath):
 def parse_tai_leap_seconds(filepath):
     with open(filepath, 'r') as leap_seconds_data:
         for line in leap_seconds_data.readlines():
-            line = line.decode('utf-8') if type(line) == type(b'a') else line
+            line = line.decode('utf-8') if isinstance(line, bytes) else line
             if line.startswith("#$"):
                 file_update_ntp = int(line.split()[1])
             elif line.startswith("#@"):
