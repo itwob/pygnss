@@ -5,10 +5,9 @@ coordinate_utils.py
 @email brianbreitsch@gmail.com
 """
 
-from numpy import sin, cos, tan, array, zeros, sqrt, arctan2, rad2deg, deg2rad, column_stack, absolute, arcsin, pi, asarray
-from datetime import datetime, timedelta
-from pytz import UTC
+from datetime import datetime, timedelta, timezone
 import numpy
+from numpy import sin, cos, tan, array, zeros, sqrt, arctan2, rad2deg, deg2rad, column_stack, absolute, arcsin, pi, asarray, ndarray
 
 def make_3_tuple_array(arr):
     """Reshapes ndarray so that it has dimensions (N,3)
@@ -221,6 +220,21 @@ def geo2sky(geo_ref, geo_obj):
     return sky
 
 
+def time2gmst(time):
+    '''Converts some time format into GMST--Greenwich Mean Standard Time.
+    `time` could be of forms:
+        ndarray -- each entry is interpreted as time in GPS seconds
+        single float -- interpreted as GPS seconds
+        datetime --
+        list of datetime objects -- TODO
+    '''
+    if isinstance(time, ndarray) or isinstance(time, float):  # assume GPS seconds vector
+        delta_days = (time - 630763213.0) / (3600 * 24)
+    elif isinstance(time, datetime) or isinstance(time, list):
+        delta_days = (time - datetime(2000, 1, 1, 12, 0, 0, tzinfo=timezone.utc)).total_seconds() / (3600 * 24)
+    return 18.697374558 + 24.065709824419 * delta_days
+
+
 def eci2ecef(eci, time):
     """Converts eci coordinates to ecef coordinates given
     the time or times for said coordinates
@@ -229,6 +243,8 @@ def eci2ecef(eci, time):
     ----------
     eci : ndarray of shape (N,3)
     time : time array in GPS seconds of shape (N,)
+        TODO fix ^^^
+        could be any format accepted by `time2gmst`
 
     Returns
     -------
@@ -242,12 +258,11 @@ def eci2ecef(eci, time):
 
     TODO: only accepts one time right now
     """
-    #delta_days = (time - datetime64(datetime(2000, 1, 1, 12, tzinfo=UTC))) / timedelta64(1, 'D')
-    delta_days = (time - 630763213.0) / (3600 * 24)
-    gmst = 18.697374558 + 24.065709824419 * delta_days
+    gmst = time2gmst(time)
+    gmst = gmst % 24
     theta = 2 * pi / 24 * gmst
-    rot = asarray([[ cos(gmst), sin(gmst), 0],
-                   [-sin(gmst), cos(gmst), 0],
+    rot = asarray([[ cos(theta), sin(theta), 0],
+                   [-sin(theta), cos(theta), 0],
                    [ 0,         0,         1]])
     return rot.dot(eci.T).T
 
@@ -259,7 +274,7 @@ def ecef2eci(ecef, time):
     Parameters
     ----------
     ecef : ndarray of shape (N,3)
-    time : time array in GPS seconds of shape (N,)
+    time : any format accepted by `time2gmst`
 
     Returns
     -------
@@ -270,13 +285,11 @@ def ecef2eci(ecef, time):
     -----
     See: http://physics.stackexchange.com/questions/98466/radians-to-rotate-earth-to-match-eci-lat-lon-with-ecef-lat-lon
     Time of 2000 January 1, 12 UTC is (in GPS seconds) 630763213.0
-
-    TODO: only accepts one time right now
     """
-    delta_days = (time - 630763213.0) / (3600 * 24)
-    gmst = 18.697374558 + 24.065709824419 * delta_days
+    gmst = time2gmst(time)
+    gmst = gmst % 24
     theta = 2 * pi / 24 * gmst
-    rot = asarray([[cos(gmst), -sin(gmst), 0],
-                   [sin(gmst),  cos(gmst), 0],
+    rot = asarray([[cos(theta), -sin(theta), 0],
+                   [sin(theta),  cos(theta), 0],
                    [ 0,         0,         1]])
     return rot.dot(ecef.T).T

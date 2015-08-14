@@ -3,7 +3,7 @@
 
 from os.path import getsize
 from os import SEEK_SET
-from numpy import zeros, byte, fromfile, uint8, int8, bitwise_and, s_, concatenate, delete
+from numpy import zeros, byte, fromfile, uint8, int8, uint16, int16, bitwise_and, s_, concatenate, delete
 
 
 class Source:
@@ -20,14 +20,14 @@ class Source:
     
     MAX_BUFFER_SIZE = 100000000  # 100 MSamples
     
-    def __init__(self, source_f_samp, source_f_center, buffer_size, bit_depth, real, decimation=1):
+    def __init__(self, source_f_samp, source_f_center, buffer_size, bit_depth, real, decimation=1, i_msb=True):
         self.source_f_samp = source_f_samp
         self.decimation = decimation
         self.f_samp = source_f_samp / decimation
         self.f_center = source_f_center
         self.bit_depth = bit_depth    # bits per sample component (8 bits total for real+imaginary)
         self.real = real
-        self.i_msb = True  # whether the complex component is in the most significant or least significant bits of a word or byte
+        self.i_msb = i_msb  # whether the real component is in the most significant or least significant bits of a word or byte
         if buffer_size > Source.MAX_BUFFER_SIZE:
             raise Error('`buffer_size` exceeds `MAX_BUFFER_SIZE`')
         self.buffer_size = buffer_size
@@ -83,12 +83,16 @@ class Source:
         elif self.bit_depth == 8:
             msb = byte_arr[0::2]  # TODO this might not be working
             lsb = byte_arr[1::2]
+        elif self.bit_depth == 16:
+            sample_arr = byte_arr.view(int16)
+            msb = sample_arr[0::2]
+            lsb = sample_arr[1::2]
         else:
             raise Error('Bit depth not supported for complex samples')
         if self.i_msb:
-            return lsb + 1j * msb
-        else:
             return msb + 1j * lsb
+        else:
+            return lsb + 1j * msb
 
 
 class FileSource(Source):
@@ -100,13 +104,13 @@ class FileSource(Source):
     
     """
     
-    def __init__(self, filepath, file_f_samp, f_center, bit_depth, real, buffer_size=None, decimation=1):
+    def __init__(self, filepath, file_f_samp, f_center, bit_depth, real, buffer_size=None, decimation=1, i_msb=True):
         self.filepath = filepath
         self.file_loc = 0
         self.file_size = getsize(filepath)
         if not buffer_size:
             buffer_size = self.file_size
-        super(FileSource, self).__init__(file_f_samp, f_center, buffer_size, bit_depth, real, decimation)
+        super(FileSource, self).__init__(file_f_samp, f_center, buffer_size, bit_depth, real, decimation, i_msb)
         self.file_duration = self.file_size / self.bytes_per_sample / self.source_f_samp
 
     def load(self, overlap=0):
